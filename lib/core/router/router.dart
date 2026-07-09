@@ -10,9 +10,11 @@ import '../../features/notes/screens/note_detail_screen.dart';
 import '../../features/notes/screens/notes_list_screen.dart';
 import '../../features/projects/screens/project_detail_screen.dart';
 import '../../features/projects/screens/projects_screen.dart';
+import '../../features/search/screens/search_screen.dart';
 import '../../features/tasks/screens/tasks_screen.dart';
 
 const kRouteHome = '/';
+const kRouteSearch = '/search';
 const kRouteSignIn = '/sign-in';
 const kRouteSignUp = '/sign-up';
 const kRouteForgotPassword = '/forgot-password';
@@ -83,6 +85,10 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => ProjectDetailScreen(
           projectId: state.pathParameters['id']!,
         ),
+      ),
+      GoRoute(
+        path: kRouteSearch,
+        builder: (context, state) => const SearchScreen(),
       ),
     ],
   );

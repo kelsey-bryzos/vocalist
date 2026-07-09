@@ -33,6 +33,11 @@ class HomeScreen extends ConsumerWidget {
         title: const Text('Vocalist'),
         actions: [
           IconButton(
+            icon: const Icon(Icons.search_rounded),
+            tooltip: 'Search',
+            onPressed: () => context.push(kRouteSearch),
+          ),
+          IconButton(
             icon: const Icon(Icons.notes_rounded),
             tooltip: 'Notes',
             onPressed: () => context.push(kRouteNotes),
