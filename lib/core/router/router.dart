@@ -2,14 +2,15 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../features/auth/providers/auth_provider.dart';
+import '../../features/auth/screens/forgot_password_screen.dart';
 import '../../features/auth/screens/sign_in_screen.dart';
 import '../../features/auth/screens/sign_up_screen.dart';
 import '../../features/home/screens/home_screen.dart';
 
-// Route name constants
+const kRouteHome = '/';
 const kRouteSignIn = '/sign-in';
 const kRouteSignUp = '/sign-up';
-const kRouteHome = '/';
+const kRouteForgotPassword = '/forgot-password';
 
 final routerProvider = Provider<GoRouter>((ref) {
   final authState = ref.watch(authStateProvider);
@@ -17,12 +18,13 @@ final routerProvider = Provider<GoRouter>((ref) {
   return GoRouter(
     initialLocation: kRouteHome,
     redirect: (context, state) {
-      final isLoading = authState.isLoading;
-      if (isLoading) return null;
+      if (authState.isLoading) return null;
 
       final isAuthenticated = authState.valueOrNull?.session != null;
-      final isOnAuthRoute = state.matchedLocation == kRouteSignIn ||
-          state.matchedLocation == kRouteSignUp;
+      final loc = state.matchedLocation;
+      final isOnAuthRoute = loc == kRouteSignIn ||
+          loc == kRouteSignUp ||
+          loc == kRouteForgotPassword;
 
       if (!isAuthenticated && !isOnAuthRoute) return kRouteSignIn;
       if (isAuthenticated && isOnAuthRoute) return kRouteHome;
@@ -40,6 +42,10 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: kRouteSignUp,
         builder: (context, state) => const SignUpScreen(),
+      ),
+      GoRoute(
+        path: kRouteForgotPassword,
+        builder: (context, state) => const ForgotPasswordScreen(),
       ),
     ],
   );
