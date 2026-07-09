@@ -6,6 +6,7 @@ import '../../auth/services/auth_service.dart';
 import '../../recordings/providers/recorder_provider.dart';
 import '../../recordings/repositories/recordings_repository.dart';
 import '../../recordings/models/recording.dart';
+import '../../recordings/widgets/processing_status_chip.dart';
 import '../../recordings/widgets/recording_sheet.dart';
 
 final _recentRecordingsProvider = FutureProvider<List<Recording>>((ref) {
@@ -124,7 +125,9 @@ class _RecordingTile extends StatelessWidget {
           style: theme.textTheme.bodySmall
               ?.copyWith(color: cs.onSurface.withValues(alpha: 0.5)),
         ),
-        trailing: _StatusChip(status: recording.status),
+        trailing: recording.status == RecordingStatus.done
+            ? _StatusChip(status: recording.status)
+            : ProcessingStatusChip(recordingId: recording.id),
       ),
     );
   }

@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../models/recording.dart';
+import '../services/pipeline_service.dart';
 import '../services/recording_service.dart';
 
 // ── Enum ───────────────────────────────────────────────────────────────────
@@ -51,6 +52,7 @@ class RecorderStateData {
 
 class RecorderNotifier extends Notifier<RecorderStateData> {
   late RecordingService _service;
+  final _pipeline = PipelineService();
   Timer? _timer;
   StreamSubscription<dynamic>? _amplitudeSub;
   int _elapsedMs = 0;
@@ -102,6 +104,8 @@ class RecorderNotifier extends Notifier<RecorderStateData> {
     try {
       final recording = await _service.stopAndUpload(projectId: projectId);
       state = RecorderStateData(lastRecording: recording);
+      // Fire-and-forget — edge function runs async, Realtime delivers updates
+      _pipeline.process(recording.id);
       return recording;
     } catch (e) {
       state = RecorderStateData(error: e.toString());

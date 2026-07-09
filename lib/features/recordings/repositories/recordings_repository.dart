@@ -14,6 +14,16 @@ class RecordingsRepository {
         .toList();
   }
 
+  Future<Recording?> fetchById(String id) async {
+    final data = await supabase
+        .from(_table)
+        .select()
+        .eq('id', id)
+        .maybeSingle();
+    if (data == null) return null;
+    return Recording.fromJson(data);
+  }
+
   Future<Recording> create({
     required String storagePath,
     String? projectId,
