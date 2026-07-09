@@ -1,3 +1,4 @@
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -12,6 +13,7 @@ import '../../features/projects/screens/project_detail_screen.dart';
 import '../../features/projects/screens/projects_screen.dart';
 import '../../features/search/screens/search_screen.dart';
 import '../../features/tasks/screens/tasks_screen.dart';
+import '../widgets/app_shell.dart';
 
 const kRouteHome = '/';
 const kRouteSearch = '/search';
@@ -23,6 +25,23 @@ const kRouteNoteDetail = '/notes/:id';
 const kRouteTasks = '/tasks';
 const kRouteProjects = '/projects';
 const kRouteProjectDetail = '/projects/:id';
+
+/// Fade + slight-scale page transition used for all main routes.
+CustomTransitionPage<T> _fadePage<T>(BuildContext context, GoRouterState state,
+    Widget child) {
+  return CustomTransitionPage<T>(
+    key: state.pageKey,
+    child: child,
+    transitionDuration: const Duration(milliseconds: 200),
+    reverseTransitionDuration: const Duration(milliseconds: 150),
+    transitionsBuilder: (context, animation, secondaryAnimation, child) {
+      return FadeTransition(
+        opacity: CurvedAnimation(parent: animation, curve: Curves.easeOut),
+        child: child,
+      );
+    },
+  );
+}
 
 final routerProvider = Provider<GoRouter>((ref) {
   final authState = ref.watch(authStateProvider);
@@ -43,52 +62,75 @@ final routerProvider = Provider<GoRouter>((ref) {
       return null;
     },
     routes: [
-      GoRoute(
-        path: kRouteHome,
-        builder: (context, state) => const HomeScreen(),
-      ),
+      // ── Auth routes (no shell) ──────────────────────────────────────────
       GoRoute(
         path: kRouteSignIn,
-        builder: (context, state) => const SignInScreen(),
+        pageBuilder: (c, s) => _fadePage(c, s, const SignInScreen()),
       ),
       GoRoute(
         path: kRouteSignUp,
-        builder: (context, state) => const SignUpScreen(),
+        pageBuilder: (c, s) => _fadePage(c, s, const SignUpScreen()),
       ),
       GoRoute(
         path: kRouteForgotPassword,
-        builder: (context, state) => const ForgotPasswordScreen(),
+        pageBuilder: (c, s) => _fadePage(c, s, const ForgotPasswordScreen()),
       ),
-      GoRoute(
-        path: kRouteNotes,
-        builder: (context, state) => NotesListScreen(
-          projectId: state.uri.queryParameters['projectId'],
-        ),
+
+      // ── Main app shell ──────────────────────────────────────────────────
+      ShellRoute(
+        builder: (context, state, child) => AppShell(child: child),
+        routes: [
+          GoRoute(
+            path: kRouteHome,
+            pageBuilder: (c, s) => _fadePage(c, s, const HomeScreen()),
+          ),
+          GoRoute(
+            path: kRouteNotes,
+            pageBuilder: (c, s) => _fadePage(
+              c,
+              s,
+              NotesListScreen(
+                projectId: s.uri.queryParameters['projectId'],
+              ),
+            ),
+          ),
+          GoRoute(
+            path: kRouteTasks,
+            pageBuilder: (c, s) => _fadePage(
+              c,
+              s,
+              TasksScreen(
+                projectId: s.uri.queryParameters['projectId'],
+              ),
+            ),
+          ),
+          GoRoute(
+            path: kRouteProjects,
+            pageBuilder: (c, s) => _fadePage(c, s, const ProjectsScreen()),
+          ),
+        ],
       ),
+
+      // ── Detail / overlay routes (no bottom nav — full screen) ───────────
       GoRoute(
         path: kRouteNoteDetail,
-        builder: (context, state) =>
-            NoteDetailScreen(noteId: state.pathParameters['id']!),
-      ),
-      GoRoute(
-        path: kRouteTasks,
-        builder: (context, state) => TasksScreen(
-          projectId: state.uri.queryParameters['projectId'],
+        pageBuilder: (c, s) => _fadePage(
+          c,
+          s,
+          NoteDetailScreen(noteId: s.pathParameters['id']!),
         ),
-      ),
-      GoRoute(
-        path: kRouteProjects,
-        builder: (context, state) => const ProjectsScreen(),
       ),
       GoRoute(
         path: kRouteProjectDetail,
-        builder: (context, state) => ProjectDetailScreen(
-          projectId: state.pathParameters['id']!,
+        pageBuilder: (c, s) => _fadePage(
+          c,
+          s,
+          ProjectDetailScreen(projectId: s.pathParameters['id']!),
         ),
       ),
       GoRoute(
         path: kRouteSearch,
-        builder: (context, state) => const SearchScreen(),
+        pageBuilder: (c, s) => _fadePage(c, s, const SearchScreen()),
       ),
     ],
   );

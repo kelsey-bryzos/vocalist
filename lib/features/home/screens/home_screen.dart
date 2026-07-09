@@ -4,6 +4,8 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/router/router.dart';
 import '../../../core/supabase/supabase_client.dart';
+import '../../../core/widgets/error_view.dart';
+import '../../../core/widgets/skeleton_loader.dart';
 import '../../auth/providers/auth_provider.dart';
 import '../../auth/services/auth_service.dart';
 import '../../recordings/providers/recorder_provider.dart';
@@ -38,21 +40,6 @@ class HomeScreen extends ConsumerWidget {
             onPressed: () => context.push(kRouteSearch),
           ),
           IconButton(
-            icon: const Icon(Icons.notes_rounded),
-            tooltip: 'Notes',
-            onPressed: () => context.push(kRouteNotes),
-          ),
-          IconButton(
-            icon: const Icon(Icons.checklist_rounded),
-            tooltip: 'Tasks',
-            onPressed: () => context.push(kRouteTasks),
-          ),
-          IconButton(
-            icon: const Icon(Icons.folder_rounded),
-            tooltip: 'Projects',
-            onPressed: () => context.push(kRouteProjects),
-          ),
-          IconButton(
             icon: const Icon(Icons.logout),
             tooltip: 'Sign out',
             onPressed: () => AuthService().signOut(),
@@ -60,8 +47,11 @@ class HomeScreen extends ConsumerWidget {
         ],
       ),
       body: recordings.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => Center(child: Text('Error: $e')),
+        loading: () => const SkeletonLoader(itemCount: 6),
+        error: (e, st) => ErrorView(
+          error: e,
+          onRetry: () => ref.invalidate(_recentRecordingsProvider),
+        ),
         data: (list) => list.isEmpty
             ? _emptyState(theme, cs, user?.email)
             : _recordingsList(list, theme, cs),
@@ -80,8 +70,8 @@ class HomeScreen extends ConsumerWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(Icons.mic_none_rounded, size: 80,
-              color: cs.onSurface.withValues(alpha: 0.2)),
+          Icon(Icons.mic_none_rounded,
+              size: 80, color: cs.onSurface.withValues(alpha: 0.2)),
           const SizedBox(height: 16),
           Text(
             'No recordings yet',
@@ -133,7 +123,8 @@ class _RecordingTile extends StatelessWidget {
         .eq('recording_id', recording.id)
         .maybeSingle();
     if (result != null && context.mounted) {
-      context.push(kRouteNoteDetail.replaceFirst(':id', result['id'] as String));
+      context
+          .push(kRouteNoteDetail.replaceFirst(':id', result['id'] as String));
     }
   }
 
@@ -154,8 +145,8 @@ class _RecordingTile extends StatelessWidget {
         ),
         title: Text(
           _label(recording),
-          style: theme.textTheme.bodyMedium
-              ?.copyWith(fontWeight: FontWeight.w500),
+          style:
+              theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w500),
         ),
         subtitle: Text(
           _subtitle(recording),
@@ -225,11 +216,13 @@ class _StatusChip extends StatelessWidget {
       RecordingStatus.transcribing => ('Transcribing', cs.secondary),
       RecordingStatus.transcribed => ('Transcribed', cs.tertiary),
       RecordingStatus.uploaded => ('Uploaded', cs.tertiary),
-      RecordingStatus.uploading => ('Uploading', cs.onSurface.withValues(alpha: 0.5)),
+      RecordingStatus.uploading =>
+        ('Uploading', cs.onSurface.withValues(alpha: 0.5)),
     };
     return Chip(
       label: Text(label,
-          style: TextStyle(fontSize: 11, color: color, fontWeight: FontWeight.w600)),
+          style: TextStyle(
+              fontSize: 11, color: color, fontWeight: FontWeight.w600)),
       side: BorderSide(color: color.withValues(alpha: 0.3)),
       backgroundColor: color.withValues(alpha: 0.08),
       padding: const EdgeInsets.symmetric(horizontal: 4),

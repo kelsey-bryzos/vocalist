@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/router/router.dart';
+import '../../../core/widgets/error_view.dart';
+import '../../../core/widgets/skeleton_loader.dart';
 import '../models/note.dart';
 import '../providers/notes_provider.dart';
 
@@ -22,8 +24,11 @@ class NotesListScreen extends ConsumerWidget {
         title: const Text('Notes'),
       ),
       body: notes.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => Center(child: Text('Error: $e')),
+        loading: () => const SkeletonLoader(itemCount: 5, itemHeight: 100),
+        error: (e, _) => ErrorView(
+          error: e,
+          onRetry: () => ref.invalidate(notesProvider(projectId)),
+        ),
         data: (list) => list.isEmpty
             ? _emptyState(theme, cs)
             : _notesList(context, list, theme, cs),

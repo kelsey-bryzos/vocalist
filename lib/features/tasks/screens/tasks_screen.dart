@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
+import '../../../core/widgets/error_view.dart';
+import '../../../core/widgets/skeleton_loader.dart';
 import '../models/task.dart';
 import '../providers/tasks_provider.dart';
 
@@ -20,8 +22,11 @@ class TasksScreen extends ConsumerWidget {
         centerTitle: false,
       ),
       body: tasksAsync.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => Center(child: Text('Error: $e')),
+        loading: () => const SkeletonLoader(itemCount: 6),
+        error: (e, _) => ErrorView(
+          error: e,
+          onRetry: () => ref.invalidate(tasksProvider(projectId)),
+        ),
         data: (tasks) => tasks.isEmpty
             ? _EmptyState(onAdd: () => _showAddTaskSheet(context, ref))
             : _TaskList(tasks: tasks, projectId: projectId),

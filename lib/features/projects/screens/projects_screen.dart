@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/router/router.dart';
+import '../../../core/widgets/error_view.dart';
+import '../../../core/widgets/skeleton_loader.dart';
 import '../models/project.dart';
 import '../providers/projects_provider.dart';
 
@@ -16,8 +18,11 @@ class ProjectsScreen extends ConsumerWidget {
     return Scaffold(
       appBar: AppBar(title: const Text('Projects')),
       body: projectsAsync.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => Center(child: Text('Error: $e')),
+        loading: () => const SkeletonLoader(itemCount: 4, itemHeight: 64),
+        error: (e, _) => ErrorView(
+          error: e,
+          onRetry: () => ref.invalidate(projectsProvider),
+        ),
         data: (projects) {
           if (projects.isEmpty) {
             return _EmptyState(onAdd: () => _showCreateSheet(context, ref));
