@@ -8,6 +8,7 @@ import '../../features/auth/screens/sign_up_screen.dart';
 import '../../features/home/screens/home_screen.dart';
 import '../../features/notes/screens/note_detail_screen.dart';
 import '../../features/notes/screens/notes_list_screen.dart';
+import '../../features/tasks/screens/tasks_screen.dart';
 
 const kRouteHome = '/';
 const kRouteSignIn = '/sign-in';
@@ -15,6 +16,7 @@ const kRouteSignUp = '/sign-up';
 const kRouteForgotPassword = '/forgot-password';
 const kRouteNotes = '/notes';
 const kRouteNoteDetail = '/notes/:id';
+const kRouteTasks = '/tasks';
 
 final routerProvider = Provider<GoRouter>((ref) {
   final authState = ref.watch(authStateProvider);
@@ -61,6 +63,12 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: kRouteNoteDetail,
         builder: (context, state) =>
             NoteDetailScreen(noteId: state.pathParameters['id']!),
+      ),
+      GoRoute(
+        path: kRouteTasks,
+        builder: (context, state) => TasksScreen(
+          projectId: state.uri.queryParameters['projectId'],
+        ),
       ),
     ],
   );

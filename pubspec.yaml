@@ -29,6 +29,9 @@ dependencies:
   # Temp directory for audio files (mobile)
   path_provider: ^2.1.5
 
+  # Date formatting
+  intl: ^0.20.2
+
   # Environment variables
   flutter_dotenv: ^5.2.1
 
