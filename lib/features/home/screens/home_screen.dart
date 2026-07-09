@@ -43,6 +43,11 @@ class HomeScreen extends ConsumerWidget {
             onPressed: () => context.push(kRouteTasks),
           ),
           IconButton(
+            icon: const Icon(Icons.folder_rounded),
+            tooltip: 'Projects',
+            onPressed: () => context.push(kRouteProjects),
+          ),
+          IconButton(
             icon: const Icon(Icons.logout),
             tooltip: 'Sign out',
             onPressed: () => AuthService().signOut(),
