@@ -17,12 +17,16 @@ class RecordingsRepository {
   Future<Recording> create({
     required String storagePath,
     String? projectId,
+    int? durationMs,
   }) async {
     final data = await supabase
         .from(_table)
         .insert({
           'storage_path': storagePath,
-          'project_id': projectId,
+          // ignore: use_null_aware_elements
+          if (projectId != null) 'project_id': projectId,
+          // ignore: use_null_aware_elements
+          if (durationMs != null) 'duration_ms': durationMs,
         })
         .select()
         .single();

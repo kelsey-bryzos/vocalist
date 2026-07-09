@@ -23,6 +23,12 @@ dependencies:
   # Audio recording
   record: ^5.2.0
 
+  # HTTP client — used for fetching web blob URLs after recording
+  http: ^1.4.0
+
+  # Temp directory for audio files (mobile)
+  path_provider: ^2.1.5
+
   # Environment variables
   flutter_dotenv: ^5.2.1
 
