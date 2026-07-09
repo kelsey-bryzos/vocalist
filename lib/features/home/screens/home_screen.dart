@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
+import '../../../core/router/router.dart';
+import '../../../core/supabase/supabase_client.dart';
 import '../../auth/providers/auth_provider.dart';
 import '../../auth/services/auth_service.dart';
 import '../../recordings/providers/recorder_provider.dart';
@@ -29,6 +32,11 @@ class HomeScreen extends ConsumerWidget {
       appBar: AppBar(
         title: const Text('Vocalist'),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.notes_rounded),
+            tooltip: 'Notes',
+            onPressed: () => context.push(kRouteNotes),
+          ),
           IconButton(
             icon: const Icon(Icons.logout),
             tooltip: 'Sign out',
@@ -103,6 +111,17 @@ class _RecordingTile extends StatelessWidget {
 
   final Recording recording;
 
+  Future<void> _openNote(BuildContext context) async {
+    final result = await supabase
+        .from('notes')
+        .select('id')
+        .eq('recording_id', recording.id)
+        .maybeSingle();
+    if (result != null && context.mounted) {
+      context.push(kRouteNoteDetail.replaceFirst(':id', result['id'] as String));
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -111,6 +130,9 @@ class _RecordingTile extends StatelessWidget {
     return Card(
       margin: EdgeInsets.zero,
       child: ListTile(
+        onTap: recording.status == RecordingStatus.done
+            ? () => _openNote(context)
+            : null,
         leading: Icon(
           _iconFor(recording.status),
           color: _colorFor(recording.status, cs),

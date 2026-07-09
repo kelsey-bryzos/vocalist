@@ -6,11 +6,15 @@ import '../../features/auth/screens/forgot_password_screen.dart';
 import '../../features/auth/screens/sign_in_screen.dart';
 import '../../features/auth/screens/sign_up_screen.dart';
 import '../../features/home/screens/home_screen.dart';
+import '../../features/notes/screens/note_detail_screen.dart';
+import '../../features/notes/screens/notes_list_screen.dart';
 
 const kRouteHome = '/';
 const kRouteSignIn = '/sign-in';
 const kRouteSignUp = '/sign-up';
 const kRouteForgotPassword = '/forgot-password';
+const kRouteNotes = '/notes';
+const kRouteNoteDetail = '/notes/:id';
 
 final routerProvider = Provider<GoRouter>((ref) {
   final authState = ref.watch(authStateProvider);
@@ -46,6 +50,17 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: kRouteForgotPassword,
         builder: (context, state) => const ForgotPasswordScreen(),
+      ),
+      GoRoute(
+        path: kRouteNotes,
+        builder: (context, state) => NotesListScreen(
+          projectId: state.uri.queryParameters['projectId'],
+        ),
+      ),
+      GoRoute(
+        path: kRouteNoteDetail,
+        builder: (context, state) =>
+            NoteDetailScreen(noteId: state.pathParameters['id']!),
       ),
     ],
   );
