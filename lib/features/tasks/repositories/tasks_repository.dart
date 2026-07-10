@@ -47,16 +47,18 @@ class TasksRepository {
     int? sortOrder,
     String? projectId,
   }) async {
+    // Only include fields that were explicitly provided — never overwrite with null.
+    final patch = <String, dynamic>{};
+    if (title != null) patch['title'] = title;
+    if (completed != null) patch['completed'] = completed;
+    if (priority != null) patch['priority'] = priority.name;
+    if (deadline != null) patch['deadline'] = deadline.toIso8601String();
+    if (sortOrder != null) patch['sort_order'] = sortOrder;
+    if (projectId != null) patch['project_id'] = projectId;
+
     final data = await supabase
         .from(_table)
-        .update({
-          'title': title,
-          'completed': completed,
-          'priority': priority?.name,
-          'deadline': deadline?.toIso8601String(),
-          'sort_order': sortOrder,
-          'project_id': projectId,
-        })
+        .update(patch)
         .eq('id', id)
         .select()
         .single();

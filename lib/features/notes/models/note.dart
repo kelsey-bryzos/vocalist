@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter/foundation.dart';
 
 @immutable
@@ -16,6 +18,12 @@ class NoteSection {
         'heading': heading,
         'bullets': bullets,
       };
+}
+
+/// Sections may arrive from Supabase as a JSON string or a pre-decoded List.
+List<NoteSection> _parseSections(dynamic raw) {
+  final list = raw is String ? (jsonDecode(raw) as List) : (raw as List);
+  return list.map((s) => NoteSection.fromJson(s as Map<String, dynamic>)).toList();
 }
 
 @immutable
@@ -49,9 +57,7 @@ class Note {
         projectId: json['project_id'] as String?,
         title: json['title'] as String,
         summary: json['summary'] as String,
-        sections: (json['sections'] as List)
-            .map((s) => NoteSection.fromJson(s as Map<String, dynamic>))
-            .toList(),
+        sections: _parseSections(json['sections']),
         createdAt: DateTime.parse(json['created_at'] as String),
         updatedAt: DateTime.parse(json['updated_at'] as String),
       );

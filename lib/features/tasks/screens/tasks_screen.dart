@@ -43,6 +43,8 @@ class TasksScreen extends ConsumerWidget {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
+      useSafeArea: true,
+      useRootNavigator: true,
       builder: (_) => _AddTaskSheet(projectId: projectId, ref: ref),
     );
   }
@@ -72,7 +74,7 @@ class _TaskList extends ConsumerWidget {
       },
       itemBuilder: (context, i) {
         final task = tasks[i];
-        return _TaskTile(key: ValueKey(task.id), task: task, projectId: projectId);
+        return _TaskTile(key: ValueKey(task.id), task: task, projectId: projectId, index: i);
       },
     );
   }
@@ -87,10 +89,12 @@ class _TaskTile extends ConsumerStatefulWidget {
     super.key,
     required this.task,
     required this.projectId,
+    required this.index,
   });
 
   final Task task;
   final String? projectId;
+  final int index;
 
   @override
   ConsumerState<_TaskTile> createState() => _TaskTileState();
@@ -150,8 +154,20 @@ class _TaskTileState extends ConsumerState<_TaskTile> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
+              crossAxisAlignment: CrossAxisAlignment.center,
               children: [
+                // Drag handle — left side
+                ReorderableDragStartListener(
+                  index: widget.index,
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 4),
+                    child: Icon(
+                      Icons.drag_handle_rounded,
+                      size: 20,
+                      color: theme.colorScheme.onSurface.withValues(alpha: 0.3),
+                    ),
+                  ),
+                ),
                 // Checkbox
                 Checkbox(
                   value: task.completed,
@@ -181,15 +197,14 @@ class _TaskTileState extends ConsumerState<_TaskTile> {
                                     ? TextDecoration.lineThrough
                                     : null,
                                 color: task.completed
-                                    ? theme.colorScheme.onSurface.withValues(
-                                        alpha: 0.4)
+                                    ? theme.colorScheme.onSurface.withValues(alpha: 0.4)
                                     : null,
                               ),
                             ),
                           ),
                         ),
                 ),
-                // Action menu
+                // Action menu — right side
                 if (_editing)
                   Row(
                     mainAxisSize: MainAxisSize.min,
@@ -213,7 +228,7 @@ class _TaskTileState extends ConsumerState<_TaskTile> {
             // Priority + deadline chips
             if (task.priority != TaskPriority.none || task.deadline != null)
               Padding(
-                padding: const EdgeInsets.only(left: 48, bottom: 6, right: 8),
+                padding: const EdgeInsets.only(left: 56, bottom: 6, right: 8),
                 child: Wrap(
                   spacing: 6,
                   children: [
