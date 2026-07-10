@@ -32,6 +32,9 @@ dependencies:
   # Date formatting
   intl: ^0.20.2
 
+  # Audio playback — for playing back recorded audio files
+  audioplayers: ^6.1.0
+
   # Google Fonts — runtime font loading (Rajdhani for display, Inter for body)
   google_fonts: ^6.2.1
 
