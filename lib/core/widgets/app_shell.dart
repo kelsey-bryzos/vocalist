@@ -3,7 +3,7 @@ import 'package:go_router/go_router.dart';
 
 import '../router/router.dart';
 
-/// Persistent shell with bottom navigation + floating mic FAB.
+/// Persistent shell with bottom navigation bar.
 /// Wraps all main destinations: Home, Notes, Tasks, Projects.
 class AppShell extends StatelessWidget {
   const AppShell({super.key, required this.child});
@@ -12,17 +12,25 @@ class AppShell extends StatelessWidget {
 
   static const _destinations = [
     _Destination(kRouteHome, Icons.home_rounded, Icons.home_outlined, 'Home'),
-    _Destination(kRouteNotes, Icons.notes_rounded, Icons.notes_outlined, 'Notes'),
+    _Destination(
+        kRouteNotes, Icons.notes_rounded, Icons.notes_outlined, 'Notes'),
     _Destination(
         kRouteTasks, Icons.checklist_rounded, Icons.checklist_outlined, 'Tasks'),
-    _Destination(kRouteProjects, Icons.folder_rounded, Icons.folder_outlined,
-        'Projects'),
+    _Destination(
+        kRouteProjects, Icons.folder_rounded, Icons.folder_outlined, 'Projects'),
   ];
 
   int _selectedIndex(BuildContext context) {
     final location = GoRouterState.of(context).uri.path;
+    // Exact match for Home to prevent it always being highlighted
+    // (since '/' is a prefix of every route)
     for (var i = 0; i < _destinations.length; i++) {
-      if (location.startsWith(_destinations[i].route)) return i;
+      final route = _destinations[i].route;
+      if (route == kRouteHome) {
+        if (location == kRouteHome) return i;
+      } else if (location.startsWith(route)) {
+        return i;
+      }
     }
     return 0;
   }
@@ -36,9 +44,9 @@ class AppShell extends StatelessWidget {
       bottomNavigationBar: NavigationBar(
         selectedIndex: selected,
         onDestinationSelected: (i) {
-          if (i != selected) {
-            context.go(_destinations[i].route);
-          }
+          // Always use go() — replaces the current shell route, enabling
+          // back-navigation from any tab to any other tab.
+          context.go(_destinations[i].route);
         },
         destinations: _destinations
             .map((d) => NavigationDestination(
@@ -53,7 +61,8 @@ class AppShell extends StatelessWidget {
 }
 
 class _Destination {
-  const _Destination(this.route, this.activeIcon, this.inactiveIcon, this.label);
+  const _Destination(
+      this.route, this.activeIcon, this.inactiveIcon, this.label);
 
   final String route;
   final IconData activeIcon;

@@ -48,6 +48,8 @@ class ProjectsScreen extends ConsumerWidget {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
+      useSafeArea: true,
+      useRootNavigator: true,
       builder: (_) => _CreateProjectSheet(ref: ref),
     );
   }
