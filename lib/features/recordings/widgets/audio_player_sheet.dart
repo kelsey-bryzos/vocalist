@@ -69,7 +69,7 @@ class _AudioPlayerSheetState extends State<AudioPlayerSheet> {
     try {
       // Get a signed URL (valid 1 hour) for the private storage file
       final signedUrl = await supabase.storage
-          .from('recordings')
+          .from('audio')
           .createSignedUrl(widget.recording.storagePath, 3600);
       await _player.play(UrlSource(signedUrl));
       if (mounted) setState(() => _loading = false);
@@ -160,7 +160,30 @@ class _AudioPlayerSheetState extends State<AudioPlayerSheet> {
               ],
             )
           else if (_error != null)
-            Text(_error!, style: TextStyle(color: cs.error), textAlign: TextAlign.center)
+            Column(
+              children: [
+                Icon(Icons.audio_file_outlined, size: 40, color: cs.error),
+                const SizedBox(height: 12),
+                Text(
+                  'Audio file not available',
+                  style: theme.textTheme.bodyMedium?.copyWith(color: cs.error),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'This recording may not have uploaded successfully.',
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: cs.onSurface.withValues(alpha: 0.5),
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 20),
+                FilledButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: const Text('Dismiss'),
+                ),
+              ],
+            )
           else ...[
             // Seek slider
             SliderTheme(
