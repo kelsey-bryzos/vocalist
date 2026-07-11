@@ -1,9 +1,10 @@
 import 'dart:async';
+import 'dart:js_interop';
 
 import 'package:flutter/foundation.dart';
-import 'package:http/http.dart' as http;
 import 'package:record/record.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:web/web.dart' as web;
 
 import '../../../core/supabase/supabase_client.dart';
 import '../models/recording.dart';
@@ -12,15 +13,10 @@ import 'file_helper_stub.dart'
     if (dart.library.io) 'file_helper_io.dart' as fh;
 
 class RecordingSession {
-  RecordingSession({
-    required this.startedAt,
-    this.durationMs = 0,
-  });
+  RecordingSession({required this.startedAt, this.durationMs = 0});
 
   final DateTime startedAt;
   int durationMs;
-
-  /// Path returned by stop() — local file path on native, blob URL on web.
   String? stoppedPath;
 }
 
@@ -66,10 +62,13 @@ class RecordingService {
     final session = _session;
     if (session == null) throw StateError('No active recording session');
 
-    // stop() returns the file path (native) or blob URL (web)
     final stoppedPath = await _recorder.stop();
     _session = null;
     session.stoppedPath = stoppedPath;
+
+    if (stoppedPath == null) {
+      throw Exception('Recorder returned no file path after stop');
+    }
 
     final storagePath = await _uploadFile(session);
     final recording = await RecordingsRepository().create(
@@ -78,9 +77,7 @@ class RecordingService {
       durationMs: session.durationMs,
     );
 
-    if (!kIsWeb && stoppedPath != null) {
-      await fh.deleteFile(stoppedPath);
-    }
+    if (!kIsWeb) await fh.deleteFile(stoppedPath);
 
     return recording;
   }
@@ -95,7 +92,7 @@ class RecordingService {
     await _recorder.dispose();
   }
 
-  // ── private ──────────────────────────────────────────────────────────────
+  // ── private ────────────────────────────────────────────────────────────────
 
   void _tick() {
     final session = _session;
@@ -113,17 +110,18 @@ class RecordingService {
 
     final Uint8List bytes;
     if (kIsWeb) {
-      final blobUrl = session.stoppedPath;
-      if (blobUrl == null) throw Exception('No blob URL after stop');
-      final response = await http.get(Uri.parse(blobUrl));
-      bytes = response.bodyBytes;
+      // On web, record returns a blob: URL. We must fetch it via the browser's
+      // native fetch API — Dart's http package cannot access blob: URLs.
+      final blobUrl = session.stoppedPath!;
+      bytes = await _fetchBlobBytes(blobUrl);
     } else {
-      final path = session.stoppedPath;
-      if (path == null) throw Exception('No file path after stop');
+      final path = session.stoppedPath!;
       final raw = await fh.readFileBytes(path);
-      if (raw == null) throw Exception('Could not read audio file');
+      if (raw == null) throw Exception('Could not read audio file from disk');
       bytes = raw is Uint8List ? raw : Uint8List.fromList(raw);
     }
+
+    if (bytes.isEmpty) throw Exception('Audio file is empty — nothing to upload');
 
     await supabase.storage.from('audio').uploadBinary(
           storagePath,
@@ -132,5 +130,15 @@ class RecordingService {
         );
 
     return storagePath;
+  }
+
+  /// Fetches a blob: URL using the browser's native fetch, returning raw bytes.
+  Future<Uint8List> _fetchBlobBytes(String blobUrl) async {
+    final response = await web.window.fetch(blobUrl.toJS).toDart;
+    if (!response.ok) {
+      throw Exception('Failed to fetch blob: HTTP ${response.status}');
+    }
+    final arrayBuffer = await response.arrayBuffer().toDart;
+    return Uint8List.view(arrayBuffer.toDart);
   }
 }

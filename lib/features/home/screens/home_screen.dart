@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../core/router/router.dart';
 import '../../../core/supabase/supabase_client.dart';
@@ -25,21 +26,27 @@ import '../../tasks/repositories/tasks_repository.dart';
 // session is already restored from storage, we fetch immediately.  We also
 // watch authStateProvider so we re-fetch when sign-in/sign-out events fire.
 
+// Realtime invalidation counter — incremented when recordings/notes/tasks change
+final _realtimeTickProvider = StateProvider<int>((ref) => 0);
+
 final _dashRecordingsProvider = FutureProvider<List<Recording>>((ref) async {
-  ref.watch(authStateProvider); // invalidate on auth change
+  ref.watch(authStateProvider);
   ref.watch(recorderProvider.select((s) => s.lastRecording));
+  ref.watch(_realtimeTickProvider);
   if (supabase.auth.currentUser == null) return [];
   return RecordingsRepository().fetchAll();
 });
 
 final _dashNotesProvider = FutureProvider<List<Note>>((ref) async {
   ref.watch(authStateProvider);
+  ref.watch(_realtimeTickProvider);
   if (supabase.auth.currentUser == null) return [];
   return NotesRepository().fetchAll();
 });
 
 final _dashTasksProvider = FutureProvider<List<Task>>((ref) async {
   ref.watch(authStateProvider);
+  ref.watch(_realtimeTickProvider);
   if (supabase.auth.currentUser == null) return [];
   return TasksRepository().fetchAll();
 });
@@ -49,6 +56,58 @@ final _dashProjectsProvider = FutureProvider<List<Project>>((ref) async {
   if (supabase.auth.currentUser == null) return [];
   return ProjectsRepository().fetchAll();
 });
+
+// Subscribes to Realtime on recordings/notes/tasks and increments the tick.
+// Mounted once at the HomeScreen level.
+class _RealtimeWatcher extends ConsumerStatefulWidget {
+  const _RealtimeWatcher({required this.child});
+  final Widget child;
+
+  @override
+  ConsumerState<_RealtimeWatcher> createState() => _RealtimeWatcherState();
+}
+
+class _RealtimeWatcherState extends ConsumerState<_RealtimeWatcher> {
+  dynamic _channel;
+
+  @override
+  void initState() {
+    super.initState();
+    _channel = supabase
+        .channel('dashboard-realtime')
+        .onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: 'recordings',
+          callback: (_) =>
+              ref.read(_realtimeTickProvider.notifier).state++,
+        )
+        .onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: 'notes',
+          callback: (_) =>
+              ref.read(_realtimeTickProvider.notifier).state++,
+        )
+        .onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: 'tasks',
+          callback: (_) =>
+              ref.read(_realtimeTickProvider.notifier).state++,
+        )
+        .subscribe();
+  }
+
+  @override
+  void dispose() {
+    _channel.unsubscribe();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => widget.child;
+}
 
 // ── Screen ───────────────────────────────────────────────────────────────────
 
@@ -80,7 +139,8 @@ class HomeScreen extends ConsumerWidget {
     final recentRecordings = (recordings.valueOrNull ?? []).take(3).toList();
     final allProjects = projects.valueOrNull ?? [];
 
-    return Scaffold(
+    return _RealtimeWatcher(
+      child: Scaffold(
       appBar: AppBar(
         title: Text(
           'VOCALIST',
@@ -209,6 +269,7 @@ class HomeScreen extends ConsumerWidget {
             _EmptyState(email: user?.email, cs: cs, theme: theme),
         ],
       ),
+    ),
     );
   }
 }
