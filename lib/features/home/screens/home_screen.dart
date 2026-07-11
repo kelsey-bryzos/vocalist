@@ -20,23 +20,35 @@ import '../../tasks/models/task.dart';
 import '../../tasks/repositories/tasks_repository.dart';
 
 // ── Dashboard data providers ─────────────────────────────────────────────────
+//
+// We use supabase.auth.currentUser (synchronous) as the fast path — if the
+// session is already restored from storage, we fetch immediately.  We also
+// watch authStateProvider so we re-fetch when sign-in/sign-out events fire.
 
-final _dashRecordingsProvider = FutureProvider<List<Recording>>((ref) {
+final _dashRecordingsProvider = FutureProvider<List<Recording>>((ref) async {
+  ref.watch(authStateProvider); // invalidate on auth change
   ref.watch(recorderProvider.select((s) => s.lastRecording));
+  if (supabase.auth.currentUser == null) return [];
   return RecordingsRepository().fetchAll();
 });
 
-final _dashNotesProvider = FutureProvider<List<Note>>(
-  (_) => NotesRepository().fetchAll(),
-);
+final _dashNotesProvider = FutureProvider<List<Note>>((ref) async {
+  ref.watch(authStateProvider);
+  if (supabase.auth.currentUser == null) return [];
+  return NotesRepository().fetchAll();
+});
 
-final _dashTasksProvider = FutureProvider<List<Task>>(
-  (_) => TasksRepository().fetchAll(),
-);
+final _dashTasksProvider = FutureProvider<List<Task>>((ref) async {
+  ref.watch(authStateProvider);
+  if (supabase.auth.currentUser == null) return [];
+  return TasksRepository().fetchAll();
+});
 
-final _dashProjectsProvider = FutureProvider<List<Project>>(
-  (_) => ProjectsRepository().fetchAll(),
-);
+final _dashProjectsProvider = FutureProvider<List<Project>>((ref) async {
+  ref.watch(authStateProvider);
+  if (supabase.auth.currentUser == null) return [];
+  return ProjectsRepository().fetchAll();
+});
 
 // ── Screen ───────────────────────────────────────────────────────────────────
 
