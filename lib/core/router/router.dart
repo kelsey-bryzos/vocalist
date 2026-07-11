@@ -108,29 +108,28 @@ final routerProvider = Provider<GoRouter>((ref) {
             path: kRouteProjects,
             pageBuilder: (c, s) => _fadePage(c, s, const ProjectsScreen()),
           ),
+          // Detail screens live inside the shell so they share the Navigator
+          GoRoute(
+            path: kRouteNoteDetail,
+            pageBuilder: (c, s) => _fadePage(
+              c,
+              s,
+              NoteDetailScreen(noteId: s.pathParameters['id']!),
+            ),
+          ),
+          GoRoute(
+            path: kRouteProjectDetail,
+            pageBuilder: (c, s) => _fadePage(
+              c,
+              s,
+              ProjectDetailScreen(projectId: s.pathParameters['id']!),
+            ),
+          ),
+          GoRoute(
+            path: kRouteSearch,
+            pageBuilder: (c, s) => _fadePage(c, s, const SearchScreen()),
+          ),
         ],
-      ),
-
-      // ── Detail / overlay routes (no bottom nav — full screen) ───────────
-      GoRoute(
-        path: kRouteNoteDetail,
-        pageBuilder: (c, s) => _fadePage(
-          c,
-          s,
-          NoteDetailScreen(noteId: s.pathParameters['id']!),
-        ),
-      ),
-      GoRoute(
-        path: kRouteProjectDetail,
-        pageBuilder: (c, s) => _fadePage(
-          c,
-          s,
-          ProjectDetailScreen(projectId: s.pathParameters['id']!),
-        ),
-      ),
-      GoRoute(
-        path: kRouteSearch,
-        pageBuilder: (c, s) => _fadePage(c, s, const SearchScreen()),
       ),
     ],
   );

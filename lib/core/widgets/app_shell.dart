@@ -20,10 +20,20 @@ class AppShell extends StatelessWidget {
         kRouteProjects, Icons.folder_rounded, Icons.folder_outlined, 'Projects'),
   ];
 
+  // Detail routes that should hide the bottom nav
+  static const _detailRoutes = [kRouteSearch];
+  static const _detailPrefixes = ['/notes/', '/projects/'];
+
+  bool _isDetailRoute(String location) {
+    if (_detailRoutes.contains(location)) return true;
+    for (final prefix in _detailPrefixes) {
+      if (location.startsWith(prefix)) return true;
+    }
+    return false;
+  }
+
   int _selectedIndex(BuildContext context) {
     final location = GoRouterState.of(context).uri.path;
-    // Exact match for Home to prevent it always being highlighted
-    // (since '/' is a prefix of every route)
     for (var i = 0; i < _destinations.length; i++) {
       final route = _destinations[i].route;
       if (route == kRouteHome) {
@@ -37,25 +47,27 @@ class AppShell extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final location = GoRouterState.of(context).uri.path;
+    final showNav = !_isDetailRoute(location);
     final selected = _selectedIndex(context);
 
     return Scaffold(
       body: child,
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: selected,
-        onDestinationSelected: (i) {
-          // Always use go() — replaces the current shell route, enabling
-          // back-navigation from any tab to any other tab.
-          context.go(_destinations[i].route);
-        },
-        destinations: _destinations
-            .map((d) => NavigationDestination(
-                  icon: Icon(d.inactiveIcon),
-                  selectedIcon: Icon(d.activeIcon),
-                  label: d.label,
-                ))
-            .toList(),
-      ),
+      bottomNavigationBar: showNav
+          ? NavigationBar(
+              selectedIndex: selected,
+              onDestinationSelected: (i) {
+                context.go(_destinations[i].route);
+              },
+              destinations: _destinations
+                  .map((d) => NavigationDestination(
+                        icon: Icon(d.inactiveIcon),
+                        selectedIcon: Icon(d.activeIcon),
+                        label: d.label,
+                      ))
+                  .toList(),
+            )
+          : null,
     );
   }
 }
