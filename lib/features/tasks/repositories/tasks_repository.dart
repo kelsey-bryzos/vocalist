@@ -23,9 +23,11 @@ class TasksRepository {
     DateTime? deadline,
     int sortOrder = 0,
   }) async {
+    final userId = supabase.auth.currentUser!.id;
     final data = await supabase
         .from(_table)
         .insert({
+          'user_id': userId,
           'title': title,
           'project_id': projectId,
           'source_note_id': sourceNoteId,

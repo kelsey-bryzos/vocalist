@@ -124,9 +124,11 @@ class RecordingSheet extends ConsumerWidget {
                     onTap: () async {
                       final recording =
                           await notifier.stop(projectId: projectId);
-                      if (context.mounted) {
+                      // Only close if upload succeeded (recording != null)
+                      if (context.mounted && recording != null) {
                         Navigator.of(context).pop(recording);
                       }
+                      // If null, error is shown in the sheet — user can retry or cancel
                     },
                   ),
               ],

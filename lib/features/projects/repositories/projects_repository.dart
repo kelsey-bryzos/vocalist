@@ -15,9 +15,10 @@ class ProjectsRepository {
   }
 
   Future<Project> create(String name) async {
+    final userId = supabase.auth.currentUser!.id;
     final data = await supabase
         .from(_table)
-        .insert({'name': name})
+        .insert({'name': name, 'user_id': userId})
         .select()
         .single();
     return Project.fromJson(data);

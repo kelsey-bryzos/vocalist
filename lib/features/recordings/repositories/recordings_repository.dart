@@ -29,9 +29,11 @@ class RecordingsRepository {
     String? projectId,
     int? durationMs,
   }) async {
+    final userId = supabase.auth.currentUser!.id;
     final data = await supabase
         .from(_table)
         .insert({
+          'user_id': userId,
           'storage_path': storagePath,
           // ignore: use_null_aware_elements
           if (projectId != null) 'project_id': projectId,
