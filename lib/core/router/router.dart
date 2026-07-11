@@ -11,6 +11,7 @@ import '../../features/notes/screens/note_detail_screen.dart';
 import '../../features/notes/screens/notes_list_screen.dart';
 import '../../features/projects/screens/project_detail_screen.dart';
 import '../../features/projects/screens/projects_screen.dart';
+import '../../features/recordings/screens/transcript_screen.dart';
 import '../../features/search/screens/search_screen.dart';
 import '../../features/tasks/screens/tasks_screen.dart';
 import '../widgets/app_shell.dart';
@@ -25,6 +26,7 @@ const kRouteNoteDetail = '/notes/:id';
 const kRouteTasks = '/tasks';
 const kRouteProjects = '/projects';
 const kRouteProjectDetail = '/projects/:id';
+const kRouteTranscript = '/transcripts/:recordingId';
 
 /// Fade + slight-scale page transition used for all main routes.
 CustomTransitionPage<T> _fadePage<T>(BuildContext context, GoRouterState state,
@@ -128,6 +130,15 @@ final routerProvider = Provider<GoRouter>((ref) {
           GoRoute(
             path: kRouteSearch,
             pageBuilder: (c, s) => _fadePage(c, s, const SearchScreen()),
+          ),
+          GoRoute(
+            path: kRouteTranscript,
+            pageBuilder: (c, s) => _fadePage(
+              c,
+              s,
+              TranscriptScreen(
+                  recordingId: s.pathParameters['recordingId']!),
+            ),
           ),
         ],
       ),
