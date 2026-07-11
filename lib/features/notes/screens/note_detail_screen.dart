@@ -1,3 +1,6 @@
+import 'dart:typed_data';
+
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -109,34 +112,31 @@ class _NoteDetailScreenState extends ConsumerState<NoteDetailScreen> {
       await ref
           .read(notesProvider(note.projectId).notifier)
           .delete(note.id);
-      if (mounted) context.pop(); // GoRouter — not Navigator.pop
+      if (mounted) context.pop();
     }
   }
 
-  Future<void> _exportPdf(Note note) async {
+  Future<Uint8List> _buildPdfBytes(Note note) async {
     final pdf = pw.Document();
-
     pdf.addPage(
       pw.MultiPage(
         pageFormat: PdfPageFormat.letter,
-        margin: const pw.EdgeInsets.all(40),
+        margin: const pw.EdgeInsets.only(
+            left: 72, right: 40, top: 40, bottom: 40),
         build: (ctx) => [
-          // Title
           pw.Text(note.title,
               style: pw.TextStyle(
-                  fontSize: 22, fontWeight: pw.FontWeight.bold)),
+                  fontSize: 20, fontWeight: pw.FontWeight.bold)),
           pw.SizedBox(height: 4),
           pw.Text(_formattedDate(note.createdAt),
-              style: const pw.TextStyle(fontSize: 10, color: PdfColors.grey600)),
-          pw.SizedBox(height: 16),
-
-          // Summary
+              style: const pw.TextStyle(
+                  fontSize: 10, color: PdfColors.grey600)),
+          pw.SizedBox(height: 14),
           if (note.summary.isNotEmpty) ...[
             pw.Container(
-              padding: const pw.EdgeInsets.all(12),
+              padding: const pw.EdgeInsets.all(10),
               decoration: pw.BoxDecoration(
                 border: pw.Border.all(color: PdfColors.blueGrey200),
-                borderRadius: const pw.BorderRadius.all(pw.Radius.circular(6)),
                 color: PdfColors.blueGrey50,
               ),
               child: pw.Column(
@@ -144,51 +144,66 @@ class _NoteDetailScreenState extends ConsumerState<NoteDetailScreen> {
                 children: [
                   pw.Text('Summary',
                       style: pw.TextStyle(
-                          fontSize: 11,
+                          fontSize: 10,
                           fontWeight: pw.FontWeight.bold,
                           color: PdfColors.blueGrey700)),
-                  pw.SizedBox(height: 6),
+                  pw.SizedBox(height: 4),
                   pw.Text(note.summary,
                       style: const pw.TextStyle(fontSize: 11)),
                 ],
               ),
             ),
-            pw.SizedBox(height: 20),
+            pw.SizedBox(height: 16),
           ],
-
-          // Sections
-          ...note.sections.map((section) => pw.Column(
-                crossAxisAlignment: pw.CrossAxisAlignment.start,
-                children: [
-                  pw.SizedBox(height: 16),
-                  pw.Text(section.heading,
-                      style: pw.TextStyle(
-                          fontSize: 14, fontWeight: pw.FontWeight.bold)),
-                  pw.SizedBox(height: 6),
-                  ...section.bullets.map((bullet) => pw.Padding(
-                        padding: const pw.EdgeInsets.only(left: 12, bottom: 4),
-                        child: pw.Row(
-                          crossAxisAlignment: pw.CrossAxisAlignment.start,
-                          children: [
-                            pw.Text('• ',
+          ...note.sections.expand((section) => [
+                pw.SizedBox(height: 14),
+                pw.Text(section.heading,
+                    style: pw.TextStyle(
+                        fontSize: 13,
+                        fontWeight: pw.FontWeight.bold,
+                        color: PdfColors.indigo900)),
+                pw.SizedBox(height: 6),
+                ...section.bullets.map((bullet) => pw.Padding(
+                      padding: const pw.EdgeInsets.only(left: 10, bottom: 4),
+                      child: pw.Row(
+                        crossAxisAlignment: pw.CrossAxisAlignment.start,
+                        children: [
+                          pw.Text('• ',
+                              style: const pw.TextStyle(fontSize: 11)),
+                          pw.Expanded(
+                            child: pw.Text(bullet,
                                 style: const pw.TextStyle(fontSize: 11)),
-                            pw.Expanded(
-                              child: pw.Text(bullet,
-                                  style: const pw.TextStyle(fontSize: 11)),
-                            ),
-                          ],
-                        ),
-                      )),
-                ],
-              )),
+                          ),
+                        ],
+                      ),
+                    )),
+              ]),
         ],
       ),
     );
+    return pdf.save();
+  }
 
-    await Printing.layoutPdf(
-      onLayout: (format) async => pdf.save(),
-      name: '${note.title}.pdf',
-    );
+  Future<void> _exportPdf(Note note) async {
+    try {
+      final bytes = await _buildPdfBytes(note);
+      if (kIsWeb) {
+        // On web, use Printing.sharePdf which triggers browser download
+        await Printing.sharePdf(
+            bytes: bytes, filename: '${note.title}.pdf');
+      } else {
+        await Printing.layoutPdf(
+          onLayout: (_) async => bytes,
+          name: '${note.title}.pdf',
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('PDF export failed: $e')),
+        );
+      }
+    }
   }
 
   Future<void> _showAddTaskSheet(Note note, {String? prefillText}) async {
@@ -230,9 +245,8 @@ class _NoteDetailScreenState extends ConsumerState<NoteDetailScreen> {
                 maxLines: 2,
               ),
               const SizedBox(height: 12),
-              // Priority picker
               DropdownButtonFormField<TaskPriority>(
-                initialValue: priority,
+                value: priority,
                 decoration: const InputDecoration(
                   labelText: 'Priority',
                   border: OutlineInputBorder(),
@@ -247,10 +261,9 @@ class _NoteDetailScreenState extends ConsumerState<NoteDetailScreen> {
                 onChanged: (v) => setModal(() => priority = v ?? priority),
               ),
               const SizedBox(height: 12),
-              // Project picker
               if (projects.isNotEmpty)
                 DropdownButtonFormField<String?>(
-                  initialValue: selectedProjectId,
+                  value: selectedProjectId,
                   decoration: const InputDecoration(
                     labelText: 'Project',
                     border: OutlineInputBorder(),
@@ -330,11 +343,6 @@ class _NoteDetailScreenState extends ConsumerState<NoteDetailScreen> {
         actions: [
           if (note != null && !_editing) ...[
             IconButton(
-              icon: const Icon(Icons.add_task_rounded),
-              tooltip: 'Add to Tasks',
-              onPressed: () => _showAddTaskSheet(note),
-            ),
-            IconButton(
               icon: const Icon(Icons.picture_as_pdf_outlined),
               tooltip: 'Export PDF',
               onPressed: () => _exportPdf(note),
@@ -376,141 +384,132 @@ class _NoteDetailScreenState extends ConsumerState<NoteDetailScreen> {
     );
   }
 
-  // ─── Read View — Notebook paper style ────────────────────────────────────
+  // ─── Read View — College-ruled notebook paper ─────────────────────────────
 
   Widget _readView(Note note) {
-    final theme = Theme.of(context);
-    final cs = theme.colorScheme;
+    // 8.5 x 11 aspect ratio: 11/8.5 = 1.294
+    return LayoutBuilder(builder: (context, constraints) {
+      // Center the page with correct aspect ratio, max width 680
+      final maxW = constraints.maxWidth > 680 ? 680.0 : constraints.maxWidth - 32;
+      final pageH = maxW * (11 / 8.5);
 
-    return Stack(
-      children: [
-        // Dark page background
-        Container(color: theme.scaffoldBackgroundColor),
-
-        // Notebook paper card
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
-          child: CustomPaint(
-            painter: _NotebookPainter(cs),
-            child: Container(
-              decoration: BoxDecoration(
-                color: const Color(0xFFFFFDE7), // cream paper color
-                borderRadius: BorderRadius.circular(4),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.35),
-                    blurRadius: 12,
-                    offset: const Offset(2, 4),
-                  ),
-                ],
-              ),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(4),
-                child: SingleChildScrollView(
-                  padding: const EdgeInsets.fromLTRB(
-                      56, 20, 20, 40), // 56 left = past red margin line
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // Title
-                      Text(
-                        note.title,
-                        style: theme.textTheme.headlineSmall?.copyWith(
-                          fontWeight: FontWeight.bold,
-                          color: const Color(0xFF1A237E), // ink blue
-                          fontFamily: 'serif',
-                          height: 1.8,
-                        ),
+      return SingleChildScrollView(
+        padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
+        child: Center(
+          child: SizedBox(
+            width: maxW,
+            child: Stack(
+              children: [
+                // ── Paper sheet ──────────────────────────────────────────
+                Container(
+                  width: maxW,
+                  constraints: BoxConstraints(minHeight: pageH),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(2),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.25),
+                        blurRadius: 16,
+                        offset: const Offset(3, 6),
                       ),
-                      Text(
-                        _formattedDate(note.createdAt),
-                        style: theme.textTheme.labelSmall?.copyWith(
-                          color: const Color(0xFF9E9E9E),
-                          height: 1.8,
-                        ),
-                      ),
-
-                      // Summary block
-                      if (note.summary.isNotEmpty) ...[
-                        const SizedBox(height: 8),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 12, vertical: 10),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFE3F2FD)
-                                .withValues(alpha: 0.6),
-                            border: Border.all(
-                                color: const Color(0xFF90CAF9), width: 1),
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Row(
-                                children: [
-                                  const Icon(Icons.auto_awesome_rounded,
-                                      size: 13,
-                                      color: Color(0xFF1565C0)),
-                                  const SizedBox(width: 5),
-                                  Text('Summary',
-                                      style:
-                                          theme.textTheme.labelSmall?.copyWith(
-                                        color: const Color(0xFF1565C0),
-                                        fontWeight: FontWeight.bold,
-                                      )),
-                                ],
-                              ),
-                              const SizedBox(height: 6),
-                              Text(note.summary,
-                                  style: theme.textTheme.bodyMedium?.copyWith(
-                                    color: const Color(0xFF212121),
-                                    height: 1.8,
-                                  )),
-                            ],
-                          ),
-                        ),
-                      ],
-
-                      // Sections
-                      ...note.sections.map((section) => _NotebookSection(
-                            section: section,
-                            note: note,
-                            onAddToTasks: (text) =>
-                                _showAddTaskSheet(note, prefillText: text),
-                          )),
-
-                      // Add whole note as task
-                      const SizedBox(height: 24),
-                      GestureDetector(
-                        onTap: () => _showAddTaskSheet(note),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(Icons.add_task_rounded,
-                                size: 16,
-                                color: const Color(0xFF1565C0)
-                                    .withValues(alpha: 0.7)),
-                            const SizedBox(width: 6),
-                            Text(
-                              'Add a task from this note',
-                              style: theme.textTheme.labelMedium?.copyWith(
-                                color: const Color(0xFF1565C0)
-                                    .withValues(alpha: 0.7),
-                                decoration: TextDecoration.underline,
-                              ),
-                            ),
-                          ],
-                        ),
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.08),
+                        blurRadius: 4,
+                        offset: const Offset(0, 1),
                       ),
                     ],
                   ),
+                  child: CustomPaint(
+                    painter: _NotebookPainter(),
+                    child: Padding(
+                      // Left: 72px (past punch holes + margin line)
+                      // Others: 24px
+                      padding: const EdgeInsets.fromLTRB(72, 24, 24, 48),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          // Title
+                          Text(
+                            note.title,
+                            style: const TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF1A237E),
+                              height: 1.7,
+                            ),
+                          ),
+                          Text(
+                            _formattedDate(note.createdAt),
+                            style: const TextStyle(
+                              fontSize: 11,
+                              color: Color(0xFF9E9E9E),
+                              height: 1.7,
+                            ),
+                          ),
+
+                          // Summary block
+                          if (note.summary.isNotEmpty) ...[
+                            const SizedBox(height: 10),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 12, vertical: 10),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFE3F2FD)
+                                    .withValues(alpha: 0.7),
+                                border: Border.all(
+                                    color: const Color(0xFF90CAF9),
+                                    width: 1),
+                                borderRadius: BorderRadius.circular(3),
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    children: [
+                                      const Icon(Icons.auto_awesome_rounded,
+                                          size: 12,
+                                          color: Color(0xFF1565C0)),
+                                      const SizedBox(width: 5),
+                                      const Text('Summary',
+                                          style: TextStyle(
+                                            fontSize: 11,
+                                            fontWeight: FontWeight.bold,
+                                            color: Color(0xFF1565C0),
+                                          )),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 5),
+                                  Text(note.summary,
+                                      style: const TextStyle(
+                                        fontSize: 13,
+                                        color: Color(0xFF212121),
+                                        height: 1.7,
+                                      )),
+                                ],
+                              ),
+                            ),
+                          ],
+
+                          // Sections
+                          ...note.sections.map((section) => _NotebookSection(
+                                section: section,
+                                onAddToTasks: (text) =>
+                                    _showAddTaskSheet(note, prefillText: text),
+                              )),
+
+                          const SizedBox(height: 32),
+                        ],
+                      ),
+                    ),
+                  ),
                 ),
-              ),
+              ],
             ),
           ),
         ),
-      ],
-    );
+      );
+    });
   }
 
   // ─── Edit View ────────────────────────────────────────────────────────────
@@ -524,8 +523,8 @@ class _NoteDetailScreenState extends ConsumerState<NoteDetailScreen> {
       children: [
         TextField(
           controller: _titleCtrl,
-          style:
-              theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
+          style: theme.textTheme.headlineSmall
+              ?.copyWith(fontWeight: FontWeight.bold),
           decoration: const InputDecoration(
             labelText: 'Title',
             border: OutlineInputBorder(),
@@ -587,43 +586,65 @@ class _NoteDetailScreenState extends ConsumerState<NoteDetailScreen> {
 }
 
 // ─── Notebook paper CustomPainter ─────────────────────────────────────────────
+// Draws: college-ruled blue lines, red vertical margin, 3 punch holes
 
 class _NotebookPainter extends CustomPainter {
-  const _NotebookPainter(this.cs);
-
-  final ColorScheme cs;
-
   @override
   void paint(Canvas canvas, Size size) {
-    const lineHeight = 28.8; // matches height: 1.8 * 16px bodyMedium
-    const leftMargin = 48.0;
-    const topOffset = 20.0;
+    const lineSpacing = 28.0; // college-ruled: ~7.1mm ≈ 28px at 96dpi
+    const marginX = 64.0;     // red margin line x position
+    const holeX = 22.0;       // center of punch holes
+    const holeR = 9.0;        // punch hole radius
 
-    // Ruled lines
+    // ── College-ruled lines ──────────────────────────────────────────────────
     final linePaint = Paint()
-      ..color = const Color(0xFFBBDEFB).withValues(alpha: 0.6)
-      ..strokeWidth = 0.8;
+      ..color = const Color(0xFFADD8E6) // light cornflower blue
+      ..strokeWidth = 0.75;
 
-    var y = topOffset + lineHeight;
+    // First line starts below the top header area (~60px)
+    var y = 60.0;
     while (y < size.height) {
       canvas.drawLine(
-        Offset(leftMargin, y),
+        Offset(marginX, y),
         Offset(size.width, y),
         linePaint,
       );
-      y += lineHeight;
+      y += lineSpacing;
     }
 
-    // Red margin line
+    // ── Red margin line ──────────────────────────────────────────────────────
     final marginPaint = Paint()
-      ..color = const Color(0xFFEF9A9A).withValues(alpha: 0.7)
-      ..strokeWidth = 1.2;
+      ..color = const Color(0xFFFF8A80) // soft red
+      ..strokeWidth = 1.5;
 
     canvas.drawLine(
-      Offset(leftMargin, 0),
-      Offset(leftMargin, size.height),
+      const Offset(marginX, 0),
+      Offset(marginX, size.height),
       marginPaint,
     );
+
+    // ── 3 punch holes ────────────────────────────────────────────────────────
+    final holePaint = Paint()
+      ..color = const Color(0xFFE0E0E0) // light grey hole
+      ..style = PaintingStyle.fill;
+
+    final holeBorderPaint = Paint()
+      ..color = const Color(0xFFBDBDBD)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 0.8;
+
+    // Top, middle, bottom holes
+    final holePositions = [
+      size.height * 0.15,
+      size.height * 0.5,
+      size.height * 0.85,
+    ];
+
+    for (final hy in holePositions) {
+      final center = Offset(holeX, hy);
+      canvas.drawCircle(center, holeR, holePaint);
+      canvas.drawCircle(center, holeR, holeBorderPaint);
+    }
   }
 
   @override
@@ -635,12 +656,10 @@ class _NotebookPainter extends CustomPainter {
 class _NotebookSection extends StatelessWidget {
   const _NotebookSection({
     required this.section,
-    required this.note,
     required this.onAddToTasks,
   });
 
   final NoteSection section;
-  final Note note;
   final void Function(String) onAddToTasks;
 
   @override
@@ -650,14 +669,13 @@ class _NotebookSection extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Section heading
           Text(
             section.heading,
             style: const TextStyle(
-              fontSize: 15,
+              fontSize: 14,
               fontWeight: FontWeight.w700,
               color: Color(0xFF1A237E),
-              height: 1.8,
+              height: 1.7,
             ),
           ),
           ...section.bullets.map((bullet) => _BulletRow(
@@ -688,54 +706,70 @@ class _BulletRowState extends State<_BulletRow> {
     return MouseRegion(
       onEnter: (_) => setState(() => _hovered = true),
       onExit: (_) => setState(() => _hovered = false),
-      child: Padding(
-        padding: const EdgeInsets.only(bottom: 2),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            // Bullet dot
-            Padding(
-              padding: const EdgeInsets.only(top: 2, right: 10),
-              child: Container(
-                width: 5,
-                height: 5,
-                decoration: const BoxDecoration(
-                  color: Color(0xFF1565C0),
-                  shape: BoxShape.circle,
+      child: Container(
+        color: _hovered
+            ? const Color(0xFFE3F2FD).withValues(alpha: 0.5)
+            : Colors.transparent,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 1),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              // Bullet dot
+              Padding(
+                padding: const EdgeInsets.only(top: 1, right: 8),
+                child: Container(
+                  width: 5,
+                  height: 5,
+                  decoration: const BoxDecoration(
+                    color: Color(0xFF1565C0),
+                    shape: BoxShape.circle,
+                  ),
                 ),
               ),
-            ),
-            // Bullet text
-            Expanded(
-              child: Text(
-                widget.bullet,
-                style: const TextStyle(
-                  fontSize: 14,
-                  color: Color(0xFF212121),
-                  height: 1.8,
+              // Bullet text
+              Expanded(
+                child: Text(
+                  widget.bullet,
+                  style: const TextStyle(
+                    fontSize: 13,
+                    color: Color(0xFF212121),
+                    height: 1.7,
+                  ),
                 ),
               ),
-            ),
-            // "+ Task" button on hover / always visible on touch
-            AnimatedOpacity(
-              opacity: _hovered ? 1.0 : 0.0,
-              duration: const Duration(milliseconds: 150),
-              child: GestureDetector(
-                onTap: widget.onAddToTasks,
-                child: Padding(
-                  padding: const EdgeInsets.only(left: 8),
-                  child: Tooltip(
-                    message: 'Add as task',
-                    child: Icon(
-                      Icons.add_task_rounded,
-                      size: 16,
-                      color: const Color(0xFF1565C0).withValues(alpha: 0.6),
+              // "+ Task" button — visible on hover (desktop), always visible on touch
+              AnimatedOpacity(
+                opacity: _hovered ? 1.0 : 0.0,
+                duration: const Duration(milliseconds: 120),
+                child: Tooltip(
+                  message: 'Add as task',
+                  child: InkWell(
+                    onTap: widget.onAddToTasks,
+                    borderRadius: BorderRadius.circular(4),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 6, vertical: 4),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: const [
+                          Icon(Icons.add_task_rounded,
+                              size: 14, color: Color(0xFF1565C0)),
+                          SizedBox(width: 3),
+                          Text('Task',
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: Color(0xFF1565C0),
+                                fontWeight: FontWeight.w600,
+                              )),
+                        ],
+                      ),
                     ),
                   ),
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
