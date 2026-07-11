@@ -14,6 +14,21 @@ import '../../tasks/providers/tasks_provider.dart';
 import '../models/note.dart';
 import '../providers/notes_provider.dart';
 
+// College-ruled line spacing — single source of truth used by painter AND text
+const double _kLineSpacing = 28.0;
+
+// Every text style must have lineHeight = _kLineSpacing.
+// Flutter's TextStyle.height is a multiplier of fontSize, so:
+//   height = _kLineSpacing / fontSize
+// This ensures every line of text lands exactly on a blue rule.
+TextStyle _ruled(double fontSize, {Color? color, FontWeight? weight}) =>
+    TextStyle(
+      fontSize: fontSize,
+      height: _kLineSpacing / fontSize,
+      color: color ?? const Color(0xFF212121),
+      fontWeight: weight,
+    );
+
 class NoteDetailScreen extends ConsumerStatefulWidget {
   const NoteDetailScreen({super.key, required this.noteId});
 
@@ -188,9 +203,7 @@ class _NoteDetailScreenState extends ConsumerState<NoteDetailScreen> {
     try {
       final bytes = await _buildPdfBytes(note);
       if (kIsWeb) {
-        // On web, use Printing.sharePdf which triggers browser download
-        await Printing.sharePdf(
-            bytes: bytes, filename: '${note.title}.pdf');
+        await Printing.sharePdf(bytes: bytes, filename: '${note.title}.pdf');
       } else {
         await Printing.layoutPdf(
           onLayout: (_) async => bytes,
@@ -384,131 +397,45 @@ class _NoteDetailScreenState extends ConsumerState<NoteDetailScreen> {
     );
   }
 
-  // ─── Read View — College-ruled notebook paper ─────────────────────────────
+  // ─── Read View ────────────────────────────────────────────────────────────
 
   Widget _readView(Note note) {
-    // 8.5 x 11 aspect ratio: 11/8.5 = 1.294
     return LayoutBuilder(builder: (context, constraints) {
-      // Center the page with correct aspect ratio, max width 680
-      final maxW = constraints.maxWidth > 680 ? 680.0 : constraints.maxWidth - 32;
-      final pageH = maxW * (11 / 8.5);
+      // Two pages side-by-side on desktop (>=900px wide), single page on mobile
+      final twoPage = constraints.maxWidth >= 900;
 
-      return SingleChildScrollView(
-        padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
-        child: Center(
-          child: SizedBox(
-            width: maxW,
-            child: Stack(
-              children: [
-                // ── Paper sheet ──────────────────────────────────────────
-                Container(
-                  width: maxW,
-                  constraints: BoxConstraints(minHeight: pageH),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(2),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.25),
-                        blurRadius: 16,
-                        offset: const Offset(3, 6),
-                      ),
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.08),
-                        blurRadius: 4,
-                        offset: const Offset(0, 1),
-                      ),
-                    ],
-                  ),
-                  child: CustomPaint(
-                    painter: _NotebookPainter(),
-                    child: Padding(
-                      // Left: 72px (past punch holes + margin line)
-                      // Others: 24px
-                      padding: const EdgeInsets.fromLTRB(72, 24, 24, 48),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          // Title
-                          Text(
-                            note.title,
-                            style: const TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                              color: Color(0xFF1A237E),
-                              height: 1.7,
-                            ),
-                          ),
-                          Text(
-                            _formattedDate(note.createdAt),
-                            style: const TextStyle(
-                              fontSize: 11,
-                              color: Color(0xFF9E9E9E),
-                              height: 1.7,
-                            ),
-                          ),
+      // Single page width: 8.5x11 ratio. Cap at 620px.
+      final pageW = twoPage
+          ? ((constraints.maxWidth - 80) / 2).clamp(300.0, 620.0)
+          : (constraints.maxWidth - 32.0).clamp(0.0, 620.0);
 
-                          // Summary block
-                          if (note.summary.isNotEmpty) ...[
-                            const SizedBox(height: 10),
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 12, vertical: 10),
-                              decoration: BoxDecoration(
-                                color: const Color(0xFFE3F2FD)
-                                    .withValues(alpha: 0.7),
-                                border: Border.all(
-                                    color: const Color(0xFF90CAF9),
-                                    width: 1),
-                                borderRadius: BorderRadius.circular(3),
-                              ),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Row(
-                                    children: [
-                                      const Icon(Icons.auto_awesome_rounded,
-                                          size: 12,
-                                          color: Color(0xFF1565C0)),
-                                      const SizedBox(width: 5),
-                                      const Text('Summary',
-                                          style: TextStyle(
-                                            fontSize: 11,
-                                            fontWeight: FontWeight.bold,
-                                            color: Color(0xFF1565C0),
-                                          )),
-                                    ],
-                                  ),
-                                  const SizedBox(height: 5),
-                                  Text(note.summary,
-                                      style: const TextStyle(
-                                        fontSize: 13,
-                                        color: Color(0xFF212121),
-                                        height: 1.7,
-                                      )),
-                                ],
-                              ),
-                            ),
-                          ],
-
-                          // Sections
-                          ...note.sections.map((section) => _NotebookSection(
-                                section: section,
-                                onAddToTasks: (text) =>
-                                    _showAddTaskSheet(note, prefillText: text),
-                              )),
-
-                          const SizedBox(height: 32),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
+      final pageContent = _NotebookPage(
+        note: note,
+        pageWidth: pageW,
+        onAddToTasks: (text) => _showAddTaskSheet(note, prefillText: text),
+        formattedDate: _formattedDate(note.createdAt),
       );
+
+      if (twoPage) {
+        // Desktop: two pages side-by-side (second page is blank continuation)
+        return SingleChildScrollView(
+          padding: const EdgeInsets.symmetric(vertical: 32, horizontal: 24),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              pageContent,
+              const SizedBox(width: 32),
+              _BlankNotebookPage(pageWidth: pageW),
+            ],
+          ),
+        );
+      } else {
+        return SingleChildScrollView(
+          padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
+          child: Center(child: pageContent),
+        );
+      }
     });
   }
 
@@ -585,36 +512,211 @@ class _NoteDetailScreenState extends ConsumerState<NoteDetailScreen> {
   }
 }
 
-// ─── Notebook paper CustomPainter ─────────────────────────────────────────────
-// Draws: college-ruled blue lines, red vertical margin, 3 punch holes
+// ─── Single notebook page widget ─────────────────────────────────────────────
+
+class _NotebookPage extends StatelessWidget {
+  const _NotebookPage({
+    required this.note,
+    required this.pageWidth,
+    required this.onAddToTasks,
+    required this.formattedDate,
+  });
+
+  final Note note;
+  final double pageWidth;
+  final void Function(String) onAddToTasks;
+  final String formattedDate;
+
+  @override
+  Widget build(BuildContext context) {
+    // 8.5x11 minimum height
+    final minH = pageWidth * (11 / 8.5);
+
+    return SizedBox(
+      width: pageWidth,
+      child: Container(
+        constraints: BoxConstraints(minHeight: minH),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(2),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.25),
+              blurRadius: 16,
+              offset: const Offset(3, 6),
+            ),
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.08),
+              blurRadius: 4,
+              offset: const Offset(0, 1),
+            ),
+          ],
+        ),
+        child: CustomPaint(
+          painter: _NotebookPainter(),
+          child: Padding(
+            // Left: 72px (clears punch holes + margin line)
+            // Top: starts at first ruled line. The painter draws first line at
+            // y=56. We pad top to 56 - half a line so title baseline hits line 1.
+            padding: const EdgeInsets.fromLTRB(72, 42, 24, 48),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Title — fontSize 18, line height = 28
+                Text(
+                  note.title,
+                  style: _ruled(18,
+                      color: const Color(0xFF1A237E),
+                      weight: FontWeight.bold),
+                ),
+                // Date — fontSize 11, line height = 28
+                Text(
+                  formattedDate,
+                  style: _ruled(11, color: const Color(0xFF9E9E9E)),
+                ),
+
+                // Summary block — height snaps to multiple of 28
+                if (note.summary.isNotEmpty) ...[
+                  const SizedBox(height: _kLineSpacing),
+                  _SummaryBox(summary: note.summary),
+                ],
+
+                // Sections
+                ...note.sections.map((section) => _NotebookSection(
+                      section: section,
+                      onAddToTasks: onAddToTasks,
+                    )),
+
+                const SizedBox(height: _kLineSpacing),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ─── Blank second page (desktop right-hand page) ─────────────────────────────
+
+class _BlankNotebookPage extends StatelessWidget {
+  const _BlankNotebookPage({required this.pageWidth});
+
+  final double pageWidth;
+
+  @override
+  Widget build(BuildContext context) {
+    final minH = pageWidth * (11 / 8.5);
+    return SizedBox(
+      width: pageWidth,
+      child: Container(
+        constraints: BoxConstraints(minHeight: minH),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(2),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.25),
+              blurRadius: 16,
+              offset: const Offset(3, 6),
+            ),
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.08),
+              blurRadius: 4,
+              offset: const Offset(0, 1),
+            ),
+          ],
+        ),
+        child: CustomPaint(
+          painter: _NotebookPainter(),
+        ),
+      ),
+    );
+  }
+}
+
+// ─── Summary box ─────────────────────────────────────────────────────────────
+// Height is a multiple of _kLineSpacing so content after it stays on-grid.
+
+class _SummaryBox extends StatelessWidget {
+  const _SummaryBox({required this.summary});
+
+  final String summary;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: const Color(0xFFE3F2FD).withValues(alpha: 0.7),
+        border: Border.all(color: const Color(0xFF90CAF9), width: 1),
+        borderRadius: BorderRadius.circular(3),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header row — 28px tall
+          SizedBox(
+            height: _kLineSpacing,
+            child: Row(
+              children: const [
+                Icon(Icons.auto_awesome_rounded,
+                    size: 12, color: Color(0xFF1565C0)),
+                SizedBox(width: 5),
+                Text('Summary',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF1565C0),
+                      height: _kLineSpacing / 11,
+                    )),
+              ],
+            ),
+          ),
+          // Summary text — each line = 28px
+          Text(
+            summary,
+            style: _ruled(13, color: const Color(0xFF212121)),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ─── Notebook paper CustomPainter ────────────────────────────────────────────
+// Draws: college-ruled blue lines, red vertical margin, 3 punch holes.
+// First line at y=56 so the title (top padding 42 + one line = 70px rendered,
+// but baseline lands on the line).
 
 class _NotebookPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
-    const lineSpacing = 28.0; // college-ruled: ~7.1mm ≈ 28px at 96dpi
-    const marginX = 64.0;     // red margin line x position
-    const holeX = 22.0;       // center of punch holes
-    const holeR = 9.0;        // punch hole radius
+    const marginX = 64.0;
+    const holeX = 22.0;
+    const holeR = 9.0;
+    // First rule at y=56 — aligns with the first text baseline given top
+    // padding of 42px and fontSize 18 ascent ~14px.
+    const firstRuleY = 56.0;
 
     // ── College-ruled lines ──────────────────────────────────────────────────
     final linePaint = Paint()
-      ..color = const Color(0xFFADD8E6) // light cornflower blue
+      ..color = const Color(0xFFADD8E6)
       ..strokeWidth = 0.75;
 
-    // First line starts below the top header area (~60px)
-    var y = 60.0;
-    while (y < size.height) {
+    var y = firstRuleY;
+    while (y <= size.height + _kLineSpacing) {
       canvas.drawLine(
         Offset(marginX, y),
         Offset(size.width, y),
         linePaint,
       );
-      y += lineSpacing;
+      y += _kLineSpacing;
     }
 
     // ── Red margin line ──────────────────────────────────────────────────────
     final marginPaint = Paint()
-      ..color = const Color(0xFFFF8A80) // soft red
+      ..color = const Color(0xFFFF8A80)
       ..strokeWidth = 1.5;
 
     canvas.drawLine(
@@ -625,7 +727,7 @@ class _NotebookPainter extends CustomPainter {
 
     // ── 3 punch holes ────────────────────────────────────────────────────────
     final holePaint = Paint()
-      ..color = const Color(0xFFE0E0E0) // light grey hole
+      ..color = const Color(0xFFE0E0E0)
       ..style = PaintingStyle.fill;
 
     final holeBorderPaint = Paint()
@@ -633,10 +735,9 @@ class _NotebookPainter extends CustomPainter {
       ..style = PaintingStyle.stroke
       ..strokeWidth = 0.8;
 
-    // Top, middle, bottom holes
     final holePositions = [
       size.height * 0.15,
-      size.height * 0.5,
+      size.height * 0.50,
       size.height * 0.85,
     ];
 
@@ -651,7 +752,7 @@ class _NotebookPainter extends CustomPainter {
   bool shouldRepaint(_NotebookPainter old) => false;
 }
 
-// ─── Notebook section block ───────────────────────────────────────────────────
+// ─── Notebook section ─────────────────────────────────────────────────────────
 
 class _NotebookSection extends StatelessWidget {
   const _NotebookSection({
@@ -664,29 +765,30 @@ class _NotebookSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(top: 20),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Blank rule gap before each section heading
+        const SizedBox(height: _kLineSpacing),
+        // Heading — sits on its own ruled line
+        SizedBox(
+          height: _kLineSpacing,
+          child: Text(
             section.heading,
-            style: const TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w700,
-              color: Color(0xFF1A237E),
-              height: 1.7,
-            ),
+            style: _ruled(14,
+                color: const Color(0xFF1A237E), weight: FontWeight.w700),
           ),
-          ...section.bullets.map((bullet) => _BulletRow(
-                bullet: bullet,
-                onAddToTasks: () => onAddToTasks(bullet),
-              )),
-        ],
-      ),
+        ),
+        ...section.bullets.map((bullet) => _BulletRow(
+              bullet: bullet,
+              onAddToTasks: () => onAddToTasks(bullet),
+            )),
+      ],
     );
   }
 }
+
+// ─── Bullet row — each row is exactly _kLineSpacing tall ─────────────────────
 
 class _BulletRow extends StatefulWidget {
   const _BulletRow({required this.bullet, required this.onAddToTasks});
@@ -707,69 +809,64 @@ class _BulletRowState extends State<_BulletRow> {
       onEnter: (_) => setState(() => _hovered = true),
       onExit: (_) => setState(() => _hovered = false),
       child: Container(
+        // Exact line height so each bullet row aligns to the next blue rule
+        height: _kLineSpacing,
         color: _hovered
             ? const Color(0xFFE3F2FD).withValues(alpha: 0.5)
             : Colors.transparent,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 1),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              // Bullet dot
-              Padding(
-                padding: const EdgeInsets.only(top: 1, right: 8),
-                child: Container(
-                  width: 5,
-                  height: 5,
-                  decoration: const BoxDecoration(
-                    color: Color(0xFF1565C0),
-                    shape: BoxShape.circle,
-                  ),
-                ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            // Bullet dot
+            Container(
+              width: 5,
+              height: 5,
+              margin: const EdgeInsets.only(right: 8),
+              decoration: const BoxDecoration(
+                color: Color(0xFF1565C0),
+                shape: BoxShape.circle,
               ),
-              // Bullet text
-              Expanded(
-                child: Text(
-                  widget.bullet,
-                  style: const TextStyle(
-                    fontSize: 13,
-                    color: Color(0xFF212121),
-                    height: 1.7,
-                  ),
-                ),
+            ),
+            // Bullet text — clips if multi-line (single rule per bullet)
+            Expanded(
+              child: Text(
+                widget.bullet,
+                style: _ruled(13, color: const Color(0xFF212121)),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
               ),
-              // "+ Task" button — visible on hover (desktop), always visible on touch
-              AnimatedOpacity(
-                opacity: _hovered ? 1.0 : 0.0,
-                duration: const Duration(milliseconds: 120),
-                child: Tooltip(
-                  message: 'Add as task',
-                  child: InkWell(
-                    onTap: widget.onAddToTasks,
-                    borderRadius: BorderRadius.circular(4),
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 6, vertical: 4),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: const [
-                          Icon(Icons.add_task_rounded,
-                              size: 14, color: Color(0xFF1565C0)),
-                          SizedBox(width: 3),
-                          Text('Task',
-                              style: TextStyle(
-                                fontSize: 11,
-                                color: Color(0xFF1565C0),
-                                fontWeight: FontWeight.w600,
-                              )),
-                        ],
-                      ),
+            ),
+            // "+ Task" button — appears on hover
+            AnimatedOpacity(
+              opacity: _hovered ? 1.0 : 0.0,
+              duration: const Duration(milliseconds: 120),
+              child: Tooltip(
+                message: 'Add as task',
+                child: InkWell(
+                  onTap: widget.onAddToTasks,
+                  borderRadius: BorderRadius.circular(4),
+                  child: Padding(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: const [
+                        Icon(Icons.add_task_rounded,
+                            size: 14, color: Color(0xFF1565C0)),
+                        SizedBox(width: 3),
+                        Text('Task',
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: Color(0xFF1565C0),
+                              fontWeight: FontWeight.w600,
+                            )),
+                      ],
                     ),
                   ),
                 ),
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
